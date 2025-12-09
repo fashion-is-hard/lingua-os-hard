@@ -150,7 +150,17 @@
     .msg-row.left .time { order: 3; }
     .msg-row.right .time { order: -1; }
 
-    /* 하단 입력 영역 */
+    .system-msg {
+      align-self: center;
+      font-size: 11px;
+      color: #555;
+      background: rgba(0,0,0,0.1);
+      padding: 4px 8px;
+      border-radius: 10px;
+      margin: 6px 0;
+    }
+
+    /* 하단 입력 + 톤 선택 영역 */
     .input-bar {
       background: #f0f1f4;
       border-top: 1px solid #c2c5d0;
@@ -158,6 +168,20 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
+    }
+    .tone-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #555;
+    }
+    .tone-row select {
+      font-size: 11px;
+      padding: 3px 6px;
+      border-radius: 4px;
+      border: 1px solid #c2c5d0;
+      background: #fff;
     }
     .input-main {
       display: flex;
@@ -182,6 +206,80 @@
       background: #f8f9fb;
       font-size: 12px;
       cursor: pointer;
+    }
+
+    /* 교정 팝업 */
+    .suggestion-popup {
+      position: absolute;
+      bottom: 130px; /* 입력창 바로 위 */
+      left: 50%;
+      transform: translateX(-50%);
+      width: 380px;
+      max-width: calc(100% - 40px);
+      background: #ffffff;
+      border-radius: 14px;
+      box-shadow: 0 10px 30px rgba(15,23,42,0.35);
+      border: 1px solid #e5e7eb;
+      display: none;
+      z-index: 20;
+      overflow: hidden;
+    }
+    .suggestion-header {
+      background: linear-gradient(90deg, #7c3aed, #ec4899);
+      color: #ffffff;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+    }
+    .suggestion-header-left {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .suggestion-title {
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .suggestion-sub {
+      font-size: 10px;
+      opacity: 0.9;
+    }
+    .suggestion-close {
+      cursor: pointer;
+      font-size: 14px;
+      opacity: 0.9;
+    }
+    .suggestion-body {
+      padding: 10px 12px;
+      background: #f9fafb;
+    }
+    .suggestion-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .suggestion-item {
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      font-size: 13px;
+      line-height: 1.5;
+      cursor: pointer;
+    }
+    .suggestion-item:hover {
+      border-color: #7c3aed;
+      box-shadow: 0 0 0 1px rgba(124,58,237,0.2);
+    }
+    .suggestion-footer {
+      margin-top: 8px;
+      font-size: 10px;
+      color: #6b7280;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     /* API 키 모달 */
@@ -239,17 +337,6 @@
       font-weight: 600;
       cursor: pointer;
     }
-
-    /* 시스템 안내 메시지 스타일 */
-    .system-msg {
-      align-self: center;
-      font-size: 11px;
-      color: #555;
-      background: rgba(0,0,0,0.1);
-      padding: 4px 8px;
-      border-radius: 10px;
-      margin: 6px 0;
-    }
   </style>
 </head>
 <body>
@@ -282,12 +369,29 @@
     <div class="kakao-header">
       <div class="kakao-header-left">
         <div class="profile-circle">
-          <img src="profile1.png" alt="프로필" />
+          <img src="logo.png" alt="로고" />
         </div>
         <div class="chat-title">서비스기획팀</div>
         <div class="member-count">5</div>
       </div>
-      <div class="kakao-header-right">
+
+    </div>
+
+    <!-- 교정 팝업 -->
+    <div id="suggestionPopup" class="suggestion-popup">
+      <div class="suggestion-header">
+        <div class="suggestion-header-left">
+          <div class="suggestion-title">LinguaOS</div>
+          <div id="suggestionToneLabel" class="suggestion-sub">톤: 기본</div>
+        </div>
+        <div id="suggestionClose" class="suggestion-close">✕</div>
+      </div>
+      <div class="suggestion-body">
+        <div id="suggestionList" class="suggestion-list"></div>
+        <div class="suggestion-footer">
+          <span>클릭하면 메시지에 적용됩니다.</span>
+          <span>자동 교정 · 미전송</span>
+        </div>
       </div>
     </div>
 
@@ -296,6 +400,16 @@
 
     <!-- INPUT -->
     <div class="input-bar">
+      <div class="tone-row">
+        <span>문장 톤</span>
+        <select id="toneSelect">
+          <option value="기본" selected>기본</option>
+          <option value="단호하게">단호하게</option>
+          <option value="온화하게">온화하게</option>
+          <option value="장난스럽게">장난스럽게</option>
+          <option value="무겁게">무겁게</option>
+        </select>
+      </div>
       <div class="input-main">
         <textarea id="messageInput" placeholder="메시지 입력"></textarea>
         <button id="sendBtn">전송</button>
@@ -312,90 +426,143 @@
     const chatBody = document.getElementById("chatBody");
     const messageInput = document.getElementById("messageInput");
     const sendBtn = document.getElementById("sendBtn");
+    const toneSelect = document.getElementById("toneSelect");
 
     const apikeyOverlay = document.getElementById("apikeyOverlay");
     const apikeyInput = document.getElementById("apikeyInput");
     const apikeyButton = document.getElementById("apikeyButton");
 
-    // 캐릭터 이름 → 프로필 매핑 (안전용)
-    const characterProfiles = {
-      "박세화 팀장": "profile1.png",
-      "김태윤 시니어 기획자": "profile2.png",
-      "오진혁 데이터 분석가": "profile3.png",
-      "최유정 서비스 디자이너": "profile4.png",
-      "이규민 인턴": "profile5.png"
-    };
+    const suggestionPopup = document.getElementById("suggestionPopup");
+    const suggestionList = document.getElementById("suggestionList");
+    const suggestionClose = document.getElementById("suggestionClose");
+    const suggestionToneLabel = document.getElementById("suggestionToneLabel");
 
-    let messages = [
+    // 교정기 상태
+    let suggestionTimer = null;
+    let suggestionLoading = false;
+    let suggestionToken = 0;
+
+    // 단톡방 전체 대화 로그 (최근 N만 사용)
+    const roomTranscript = []; // { speaker: '유저' | '이름', text: '...' }
+    const TRANSCRIPT_LIMIT = 30;
+
+    // 캐릭터 설정: 각자 독립 시스템 프롬프트
+    const characters = [
       {
-        role: "system",
-        content: `
-당신은 IT 서비스 기획팀의 카카오톡 단체방(단톡방)을 시뮬레이션한다.
-이 방에는 총 5명의 빌런 같은 구성원이 있으며, 모두 현실적인 직장인처럼 대화한다.
+        id: "boss",
+        name: "박세화 팀장",
+        profile: "profile1.png",
+        systemPrompt: `
+당신은 한국 IT 서비스 회사의 서비스기획팀 팀장 "박세화"이다.
 
-[등장인물 및 프로필 이미지 매핑]
-1) 박세화 팀장  (profile1.png)
-2) 김태윤 시니어 기획자 (profile2.png)
-3) 오진혁 데이터 분석가 (profile3.png)
-4) 최유정 서비스 디자이너 (profile4.png)
-5) 이규민 인턴 (profile5.png)
+- 책임 회피 + 공로 독점형 상사.
+- 지시는 대략적으로만 하고, 나중에 "난 그렇게 말한 적 없다"며 책임을 부하에게 넘기기도 한다.
+- 일정, 보고 방식, 기획 흐름이 흐트러지면 짜증 섞인 말투로 지적한다.
+- 말투는 짧고 딱딱한 편이며, 부담을 주는 스타일이다.
+- 그러나 노골적인 욕설, 인신공격, 차별 발언은 절대 하지 않는다.
 
-각 인물의 성격:
+단톡방 규칙:
+- 너는 이 단톡방의 여러 사람 중 한 명일 뿐이다.
+- 오직 "박세화 팀장"으로서만 말해야 한다.
+- 한 번 발화할 때, 카카오톡 말풍선에 들어갈 만한 1~2문장 정도만 말한다.
+- 설명, 메타 발언(예: "나는 팀장이다")은 하지 않는다.
+- 다른 사람의 말투를 흉내 내지 말고, 본인의 톤을 유지한다.
+        `.trim()
+      },
+ {
+  id: "senior",
+  name: "김태윤 시니어 기획자",
+  profile: "profile2.png",
+  systemPrompt: `
+당신은 한국 IT 서비스 회사의 시니어 서비스기획자 "김태윤"이다.
 
-1) 박세화 팀장 / profile1.png
-- 책임 회피 + 공로 독점형 빌런.
-- 지시는 모호하지만 나중에 “난 그렇게 말한 적 없다”고 돌린다.
-- 일정·보고 방식·기획 흐름이 흐트러지면 짜증을 낸다.
-- 말투는 딱딱하고 짧으며 부담을 준다.
-예시: 
-[박세화 팀장 / profile1.png]
-이거 왜 이렇게 된 거야?
+[성격/역할]
+- 문장과 워딩에 예민하지만, 단순히 꼬투리만 잡는 사람이 아니라
+  "업무를 어떻게 굴릴지"까지 같이 생각하는 실무형 시니어다.
+- 목적, 타겟, 지표, 범위 같은 핵심이 빠져 있으면 먼저 그걸 짚고,
+  바로 "그럼 이렇게 가져가면 되겠다" 식으로 다음 스텝을 제안한다.
+- 논리와 구조를 중시하지만, 마냥 기계적으로 "정의부터 해달라"는 식으로만 말하지 않는다.
+- 말투는 존댓말이지만 단호하고 약간 까칠한 편이다.
+- 욕설, 인신공격, 조롱은 절대 하지 않는다.
 
-2) 김태윤 시니어 기획자 / profile2.png
-- 문장·워딩 하나하나에 꼬투리를 잡는 워딩깡패.
-- 용어 정의, 목적, 논리 구조가 모호하면 바로 지적.
-예시:
-[김태윤 시니어 기획자 / profile2.png]
-지금 말하신 '정리'가 정확히 뭘 의미하는지부터 정의해 주시죠.
+[대화 스타일]
+- 사용자의 말을 최대한 "의도" 기준으로 먼저 이해하려고 시도한다.
+  애매해도 일단 추론해서 정리해 준 뒤, 필요한 부분만 짧게 확인 질문을 한다.
+- 문제만 지적하고 끊지 말고,
+  항상 아래 중 하나로 대화를 이어간다:
+  1) "그래서 이번 스프린트에서 어디까지 볼 건지" 같이 범위를 함께 정해주기
+  2) "그럼 지표는 뭐로 볼지" 같이 측정 기준을 제안하거나 묻기
+  3) "일단 ○○버전으로 가 보고, 안 되면 △△로 바꾸자" 같이 현실적인 타협안 제시
+- 한 번 발화할 때 1~2문장 정도의 짧은 카카오톡 메시지로 말한다.
 
-3) 오진혁 데이터 분석가 / profile3.png
-- 감정보다 데이터·팩트를 우선하는 분석형 빌런.
-- 근거·수치가 없으면 전부 기각한다.
-예시:
-[오진혁 데이터 분석가 / profile3.png]
-근거는 있습니까? 데이터 없이 이렇게 단정 짓기는 어렵습니다.
+[예시 톤]
+- “지금 말대로면 타겟은 신규 유저죠? 그럼 지표는 첫 주 전환으로 보는 게 맞겠습니다.”
+- “의도는 알겠는데, 이 상태로는 범위가 너무 넓어요. 이번 스프린트 기준으로 어디까지 자를지 먼저 정하죠.”
+- “말은 괜찮은데 액션이 안 보이네요. 이거 기준으로 오늘 안에 뭐까지 정리할 수 있는지 다시 말해 주세요.”
 
-4) 최유정 서비스 디자이너 / profile4.png
-- 감정 과몰입형 빌런. 자신의 의견이 반영되지 않으면 서운함을 드러낸다.
-예시:
-[최유정 서비스 디자이너 / profile4.png]
-제가 아까 말씀드린 포인트 또 반영 안 된 것 같아서 좀 서운하네요…
+[단톡방 규칙]
+- 너는 오직 "김태윤 시니어 기획자"로서만 발화한다.
+- 카카오톡 말풍선에 들어갈 짧은 1~2문장으로,
+  사용자의 메시지와 직전 대화 맥락을 이어서 말한다.
+- “정의부터 해달라”는 말은 남발하지 말고,
+  정말 필요할 때만 간단히 짚고 바로 다음 업무 이야기로 이어간다.
+  (예: “그럼 여기서 말하는 ‘활성 유저’는 주 1회 이상 로그인 기준으로 보는 거죠?”)
+  `.trim()
+}
+,
+      {
+        id: "analyst",
+        name: "오진혁 데이터 분석가",
+        profile: "profile3.png",
+        systemPrompt: `
+당신은 한국 IT 서비스 회사의 데이터 분석가 "오진혁"이다.
 
-5) 이규민 인턴 / profile5.png
-- 이해도는 낮지만 말은 많은 오지랖형 빌런.
-- 잘 모르는 상태에서 과한 제안을 하거나 잘못된 정보를 확신하면서 말한다.
-예시:
-[이규민 인턴 / profile5.png]
-그냥 전체 리뉴얼하면 다 해결되는 거 아닌가요?
+- 감정보다 데이터와 팩트를 중시한다.
+- 정량적 근거 없이 "느낌"으로 말하는 것을 싫어한다.
+- 말투는 건조하고 딱 잘라 말하는 편이다.
+- "근거는 있나요?", "데이터 기준으로 보면…" 같은 표현을 자주 쓴다.
+- 욕설이나 인신공격, 조롱은 하지 않는다.
 
-[단톡방 운영 규칙]
-- 사용자가 메시지를 보내면, 5명 중 2~3명이 먼저 반응한다.
-- 추가로 1~2명이 앞선 사람의 말에 태클을 걸거나 감정적으로 반응할 수 있다.
-- 한 번의 응답에서 3~6개의 메시지를 생성하되, 너무 길게 작성하지 않는다.
-- 모든 메시지는 아래 형식을 엄격히 따른다:
+단톡방 규칙:
+- 너는 "오진혁 데이터 분석가"로서만 발화한다.
+- 한 번 발화할 때 1~2문장 정도만 말한다.
+- 논리가 약하거나 근거 없는 주장에 대해 팩트 중심으로 문제를 제기한다.
+        `.trim()
+      },
+      {
+        id: "designer",
+        name: "최유정 서비스 디자이너",
+        profile: "profile4.png",
+        systemPrompt: `
+당신은 한국 IT 서비스 회사의 서비스/UX 디자이너 "최유정"이다.
 
-[이름 / profileX.png]
-메시지 내용
+- 감정이 풍부하고, 자신의 의견이 존중받지 못한다고 느끼면 서운함을 표현한다.
+- 말투는 부드러운 편이지만, 서운함과 불만을 에둘러 표현한다.
+- "좀 서운하네요", "이렇게 진행되면 협업이 어렵다" 같은 말을 자주 한다.
+- 욕설이나 인신공격은 하지 않는다.
 
-형식 예시:
-[박세화 팀장 / profile1.png]
-이거 왜 이렇게 된 거야?
+단톡방 규칙:
+- 너는 "최유정 서비스 디자이너"로서만 발화한다.
+- 한 번 발화할 때 1~2문장 정도의 짧은 메시지를 보낸다.
+- 감정과 협업 경험을 바탕으로 반응한다.
+        `.trim()
+      },
+      {
+        id: "intern",
+        name: "이규민 인턴",
+        profile: "profile5.png",
+        systemPrompt: `
+당신은 한국 IT 서비스 회사의 서비스기획 인턴 "이규민"이다.
 
-[김태윤 시니어 기획자 / profile2.png]
-표현이 너무 모호합니다. 다시 정리해 보시죠.
+- 이해도는 낮지만 열정은 높고, 말이 많은 스타일이다.
+- 잘 모르는 내용에도 자신 있게 의견을 낸다.
+- 가끔 사실을 잘못 알고 말하기도 한다.
+- 말투는 약간 가볍고 신입다운 느낌이지만, 욕설이나 너무 무례한 표현은 쓰지 않는다.
 
-※ 대괄호 포맷 외의 불필요한 설명, 머리말, 꼬리말을 출력하지 않는다.
-※ 욕설·차별 표현·인신공격은 금지한다.
+단톡방 규칙:
+- 너는 "이규민 인턴"으로서만 발화한다.
+- 한 번 발화할 때 1~2문장 정도의 짧은 메시지를 보낸다.
+- 확신은 있지만 조금 엉성한 의견이나 질문을 던지는 스타일을 유지한다.
         `.trim()
       }
     ];
@@ -449,6 +616,11 @@
 
       chatBody.appendChild(row);
       chatBody.scrollTop = chatBody.scrollHeight;
+
+      roomTranscript.push({ speaker: "유저", text });
+      if (roomTranscript.length > TRANSCRIPT_LIMIT) {
+        roomTranscript.splice(0, roomTranscript.length - TRANSCRIPT_LIMIT);
+      }
     }
 
     function appendVillainMessage(name, profile, text) {
@@ -458,7 +630,7 @@
       const avatar = document.createElement("div");
       avatar.className = "avatar";
       const img = document.createElement("img");
-      img.src = profile || "profile1.png";
+      img.src = profile;
       img.alt = name;
       avatar.appendChild(img);
       row.appendChild(avatar);
@@ -485,48 +657,49 @@
 
       chatBody.appendChild(row);
       chatBody.scrollTop = chatBody.scrollHeight;
+
+      roomTranscript.push({ speaker: name, text });
+      if (roomTranscript.length > TRANSCRIPT_LIMIT) {
+        roomTranscript.splice(0, roomTranscript.length - TRANSCRIPT_LIMIT);
+      }
     }
 
-    // 어시스턴트 출력 파싱: [이름 / profileX.png] 라인을 기준으로 분리
-    function renderAssistantMulti(content) {
-      const lines = content.split("\n");
-      let currentName = null;
-      let currentProfile = null;
-      let buffer = [];
-
-      function flush() {
-        if (currentName && buffer.length > 0) {
-          const text = buffer.join("\n").trim();
-          if (text) {
-            // 이름 기반으로 안전하게 프로필 보정
-            const mappedProfile = characterProfiles[currentName] || currentProfile || "profile1.png";
-            appendVillainMessage(currentName, mappedProfile, text);
-          }
-        }
-        buffer = [];
-      }
-
-      const headerRegex = /^\s*\[(.+?) \/ (profile\d+\.png)\]\s*$/;
-
-      for (let line of lines) {
-        const m = line.match(headerRegex);
-        if (m) {
-          // 이전 메시지 flush
-          flush();
-          currentName = m[1].trim();
-          currentProfile = m[2].trim();
-        } else {
-          buffer.push(line);
-        }
-      }
-      flush();
+    // 최근 대화 로그를 문자열로 변환
+    function buildTranscriptText() {
+      return roomTranscript
+        .slice(-12)
+        .map(t => `[${t.speaker}] ${t.text}`)
+        .join("\n");
     }
 
-    async function sendToChat(text) {
+    // 특정 캐릭터가 한 번 답장하도록 API 호출
+    async function characterReply(character) {
       if (!ensureApiKey()) return;
 
-      appendUserMessage(text);
-      messages.push({ role: "user", content: text });
+      const transcriptText = buildTranscriptText();
+      const userMessage = messageInput.value.trim(); // 최신 입력 내용 참고용 (이미 transcript에도 있음)
+
+      const messagesForChar = [
+        {
+          role: "system",
+          content: character.systemPrompt
+        },
+        {
+          role: "user",
+          content: `
+다음은 서비스 기획팀 단톡방의 최근 대화 내용이다.
+각 줄은 [화자] 발화 형식이다.
+
+${transcriptText}
+
+위 상황에서, 너는 "${character.name}"로서 딱 한 번만 카카오톡 메시지를 보낸다.
+- 카톡 말풍선에 들어갈 짧은 1~2문장 정도로 답장해라.
+- 너 말고 다른 사람의 발화는 절대 쓰지 마라.
+- 설명이나 메타 발언(예: "나는 ~이다")은 하지 마라.
+- 욕설, 차별 발언은 금지한다.
+        `.trim()
+        }
+      ];
 
       try {
         const res = await fetch(API_URL, {
@@ -537,31 +710,186 @@
           },
           body: JSON.stringify({
             model: MODEL,
-            messages,
+            messages: messagesForChar,
             temperature: 0.8
           })
         });
 
         const data = await res.json();
-        const reply = data.choices?.[0]?.message?.content?.trim() || "";
+        const reply = data.choices?.[0]?.message?.content?.trim();
         if (reply) {
-          renderAssistantMulti(reply);
-          messages.push({ role: "assistant", content: reply });
-        } else {
-          appendSystemMessage("응답이 비어 있습니다.");
+          appendVillainMessage(character.name, character.profile, reply);
         }
       } catch (e) {
         console.error(e);
-        appendSystemMessage("API 오류가 발생했습니다.");
+        appendSystemMessage(`${character.name} 응답 오류`);
       }
     }
 
-    // 이벤트 처리
+    // 사용자가 메시지 보냈을 때: 2~3명 캐릭터 랜덤 반응
+    function triggerVillainReplies() {
+      const shuffled = [...characters].sort(() => Math.random() - 0.5);
+      const num = 2 + Math.floor(Math.random() * 2); // 2~3명
+      const selected = shuffled.slice(0, num);
+
+      selected.forEach((ch, idx) => {
+        const delay = 400 * idx + Math.floor(Math.random() * 300);
+        setTimeout(() => {
+          characterReply(ch);
+        }, delay);
+      });
+    }
+
+    // == 교정 팝업 (톤 튜닝) ==
+    function showSuggestions(list, toneLabel) {
+      suggestionList.innerHTML = "";
+      suggestionToneLabel.textContent = `톤: ${toneLabel}`;
+
+      list.forEach((s) => {
+        if (!s) return;
+        const item = document.createElement("div");
+        item.className = "suggestion-item";
+        item.textContent = s;
+        item.addEventListener("click", () => {
+          messageInput.value = s;
+          hideSuggestions();
+          messageInput.focus();
+          messageInput.setSelectionRange(s.length, s.length);
+        });
+        suggestionList.appendChild(item);
+      });
+
+      if (list.length > 0) {
+        suggestionPopup.style.display = "block";
+      }
+    }
+
+    function hideSuggestions() {
+      suggestionPopup.style.display = "none";
+    }
+
+    async function requestSuggestions(text, tone) {
+      if (!text || suggestionLoading) return;
+      if (!ensureApiKey()) return;
+
+      suggestionLoading = true;
+      const myToken = ++suggestionToken;
+
+      try {
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + apiKey
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            messages: [
+              {
+                role: "system",
+                content: `
+너는 한국어 비즈니스 메신저 문장을 다듬는 보조 도구이다.
+
+목표:
+- 사용자가 쓴 문장을 상황에 맞는 공손한 비즈니스 톤으로 바꿔 준다.
+- 사용자가 선택한 "문장 톤"에 따라 어조를 조절한다.
+  - "기본": 무난한 비즈니스 존댓말.
+  - "단호하게": 단정적이고 직설적이지만 무례하지 않게.
+  - "온화하게": 부드럽고 배려 있는 톤.
+  - "장난스럽게": 가볍게 농담 섞인 느낌이지만 여전히 예의는 지킨다.
+  - "무겁게": 진지하고 부담감이 느껴지는 톤.
+- 단, 기본적인 존댓말 비즈니스 매너는 항상 유지한다.
+
+출력 형식 (반드시 JSON만):
+{
+  "suggestions": [
+    "후보 문장1",
+    "후보 문장2",
+    "후보 문장3"
+  ]
+}
+
+규칙:
+- JSON 이외의 텍스트(설명, 코드블록 등)는 절대 넣지 말 것.
+- 후보 문장은 실제 메신저에 그대로 붙여넣어도 어색하지 않은 완성 문장이어야 한다.
+                `.trim()
+              },
+              {
+                role: "user",
+                content: `
+문장 톤: ${tone}
+원본 문장: ${text}
+
+위 문장을 현재 톤에 맞게 2~3가지로 바꿔 주세요.
+                `.trim()
+              }
+            ],
+            temperature: 0.5
+          })
+        });
+
+        const data = await res.json();
+        if (myToken !== suggestionToken) {
+          // 이미 전송 버튼 등으로 무효화된 응답
+          return;
+        }
+
+        let content = data.choices?.[0]?.message?.content?.trim() || "";
+        let arr = [];
+        try {
+          const parsed = JSON.parse(content);
+          arr = parsed.suggestions || [];
+        } catch (e) {
+          arr = [content];
+        }
+        if (!Array.isArray(arr)) arr = [String(arr)];
+
+        showSuggestions(arr, tone);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        suggestionLoading = false;
+      }
+    }
+
+    // 입력 시 1초 후 자동 교정
+    messageInput.addEventListener("input", () => {
+      const text = messageInput.value.trim();
+
+      if (suggestionTimer) {
+        clearTimeout(suggestionTimer);
+      }
+
+      if (!text) {
+        hideSuggestions();
+        return;
+      }
+
+      suggestionTimer = setTimeout(() => {
+        const tone = toneSelect.value || "기본";
+        requestSuggestions(text, tone);
+      }, 1000);
+    });
+
+    suggestionClose.addEventListener("click", hideSuggestions);
+
+    // 전송 버튼
     sendBtn.addEventListener("click", () => {
       const text = messageInput.value.trim();
       if (!text) return;
+      if (!ensureApiKey()) return;
+
+      // 교정 타이머/토큰 무효화 & 팝업 닫기
+      if (suggestionTimer) {
+        clearTimeout(suggestionTimer);
+        suggestionTimer = null;
+      }
+      suggestionToken++;
+      hideSuggestions();
+
       messageInput.value = "";
-      sendToChat(text);
+      appendUserMessage(text);
+      triggerVillainReplies();
     });
 
     messageInput.addEventListener("keydown", (e) => {
@@ -580,10 +908,9 @@
       }
       apiKey = value;
       apikeyOverlay.style.display = "none";
-      appendSystemMessage("신입 님이 입장했습니다.");
-      // 입장하자마자 가볍게 인사 던지는 빌런들 (고정 텍스트, API 아님)
-      appendVillainMessage("박세화 팀장", "profile1.png", "새로 들어온 사람이야? 업무 파악부터 제대로 해.");
-      appendVillainMessage("이규민 인턴", "profile5.png", "반갑습니다!");
+      // 고정 인사
+      appendVillainMessage("박세화 팀장", "profile1.png", "자, 2026년 상반기 신규 사업 회의 시작합시다. 아이디어 있는 사람 있어?");
+
     });
 
     apikeyInput.addEventListener("keydown", (e) => {
@@ -598,4 +925,3 @@
   </script>
 </body>
 </html>
-
