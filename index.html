@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>빌런 단톡방 - 서비스기획팀</title>
+  <title>서비스기획팀</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     * {
@@ -284,11 +284,10 @@
         <div class="profile-circle">
           <img src="profile1.png" alt="프로필" />
         </div>
-        <div class="chat-title">서비스기획팀 (빌런들)</div>
+        <div class="chat-title">서비스기획팀</div>
         <div class="member-count">5</div>
       </div>
       <div class="kakao-header-right">
-        빌런 단톡방
       </div>
     </div>
 
@@ -581,10 +580,10 @@
       }
       apiKey = value;
       apikeyOverlay.style.display = "none";
-      appendSystemMessage("빌런 단톡방에 입장했습니다.");
+      appendSystemMessage("신입 님이 입장했습니다.");
       // 입장하자마자 가볍게 인사 던지는 빌런들 (고정 텍스트, API 아님)
       appendVillainMessage("박세화 팀장", "profile1.png", "새로 들어온 사람이야? 업무 파악부터 제대로 해.");
-      appendVillainMessage("이규민 인턴", "profile5.png", "선배님, 이제 저만 혼나는 건가요… 반갑습니다!");
+      appendVillainMessage("이규민 인턴", "profile5.png", "반갑습니다!");
     });
 
     apikeyInput.addEventListener("keydown", (e) => {
@@ -599,3 +598,4 @@
   </script>
 </body>
 </html>
+
